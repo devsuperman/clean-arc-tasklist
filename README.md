@@ -12,6 +12,7 @@ A backend for a task list to study Clean Architecture.
 | [Tech stack & architecture](docs/02-tech-stack.md) | .NET 10, Clean Architecture layers, patterns, tooling, CI |
 | [Development tasks](docs/03-development-tasks.md) | Backlog by milestone with acceptance criteria and Definition of Done |
 | [Parallel execution plan](docs/04-parallel-execution-plan.md) | Waves, lanes, critical path and merge-conflict rules for building in parallel |
+| [Rule traceability](docs/05-rule-traceability.md) | Each business rule ID and the tests that cover it |
 
 ## Getting started
 

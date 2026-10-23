@@ -27,6 +27,10 @@ jobs:
       - name: Format check
         run: dotnet format --verify-no-changes --no-restore
 
+      # Every business rule ID in docs/01-business-rules.md must be referenced by a test (TL-044).
+      - name: Rule traceability
+        run: python3 build/check-rule-traceability.py
+
       - name: Build
         run: dotnet build -c Release --no-restore
 
