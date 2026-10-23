@@ -44,6 +44,16 @@ jobs:
           "-assemblyfilters:+TaskList.Domain;+TaskList.Application;+TaskList.Infrastructure;+TaskList.Api"
           "-classfilters:-TaskList.Infrastructure.Persistence.Migrations.*"
 
+      # TL-043: the business rules live in Domain + Application, so they must stay well covered.
+      - name: Coverage gate (Domain + Application >= 90% lines)
+        run: |
+          dotnet reportgenerator \
+            "-reports:tests/**/TestResults/coverage.cobertura*.xml" \
+            -targetdir:coverage/gate \
+            -reporttypes:Cobertura \
+            "-assemblyfilters:+TaskList.Domain;+TaskList.Application"
+          python3 build/check-coverage.py coverage/gate/Cobertura.xml 90
+
       - name: Publish coverage summary
         if: always()
         run: cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
