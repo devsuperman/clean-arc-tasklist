@@ -1,2 +1,2 @@
 # clean-arc
-clean architecture study project
+a backend for a task list to study clean architecture
