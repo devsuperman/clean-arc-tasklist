@@ -15,7 +15,20 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    image: tasklist-api
+    build:
+      context: .
+      dockerfile: src/TaskList.Api/Dockerfile
+    environment:
+      # Development: applies migrations on startup and serves Scalar at /scalar.
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__Database: Host=db;Port=5432;Database=tasklist;Username=tasklist;Password=tasklist;Gss Encryption Mode=Disable
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db-data:
-
-# The `api` service is added together with the Dockerfile (TL-040).
