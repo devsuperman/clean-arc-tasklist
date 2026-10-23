@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TaskList.Application.Abstractions.Data;
 using TaskList.Infrastructure.Persistence;
+using TaskList.Infrastructure.Persistence.Repositories;
 
 namespace TaskList.Infrastructure;
 
@@ -18,6 +19,9 @@ public static class DependencyInjection
             .UseSnakeCaseNamingConvention());
 
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddScoped<IReadDbContext, ReadDbContext>();
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<ITaskRepository, TaskRepository>();
 
         return services;
     }
