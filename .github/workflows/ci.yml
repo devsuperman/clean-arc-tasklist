@@ -53,3 +53,28 @@ jobs:
         with:
           name: coverage
           path: coverage
+
+  migrations-bundle:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Self-contained executable that applies pending migrations; see README "Database migrations".
+      - name: Build migrations bundle
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle \
+            --project src/TaskList.Infrastructure \
+            --startup-project src/TaskList.Infrastructure \
+            --self-contained -r linux-x64 \
+            -o artifacts/efbundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efbundle-linux-x64
+          path: artifacts/efbundle

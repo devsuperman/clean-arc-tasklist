@@ -198,8 +198,9 @@ public Result Complete(DateTimeOffset now)
 - Unique index on `lower(name)` for categories (backs BR-C01 at DB level).
 - Indexes: `tasks(category_id)`, `tasks(status)`, `tasks(due_date)`.
 - `IUnitOfWork.SaveChangesAsync` is called by the command handler; repositories never save by themselves.
-- Migrations are applied automatically on startup **only in Development**; other environments use
-  `dotnet ef migrations bundle` or a SQL script in the deploy pipeline.
+- Migrations are applied automatically on startup **only in Development**; other environments run the
+  self-contained migrations bundle built by CI (see README "Database migrations").
+- A design-time `DbContext` factory in Infrastructure lets `dotnet ef` run without starting the API host.
 
 ### 4.5 API conventions
 

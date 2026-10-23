@@ -26,3 +26,26 @@ dotnet test                                   # all tests (integration tests nee
 
 The connection string lives in `src/TaskList.Api/appsettings.Development.json` and matches the
 `db` service in `docker-compose.yml`. Override it with the `ConnectionStrings__Database` environment variable.
+
+## Database migrations
+
+- **Development:** migrations are applied automatically when the API starts.
+- **Other environments:** CI publishes a self-contained migrations bundle (`efbundle-linux-x64` artifact).
+  Run it in the deploy pipeline before starting the new API version:
+
+  ```bash
+  ./efbundle --connection "Host=...;Database=tasklist;Username=...;Password=..."
+  ```
+
+  Build it locally with:
+
+  ```bash
+  dotnet ef migrations bundle --project src/TaskList.Infrastructure --startup-project src/TaskList.Infrastructure \
+    --self-contained -r linux-x64 -o efbundle
+  ```
+
+Create a new migration (only one schema change at a time, see the [parallel plan](docs/04-parallel-execution-plan.md#6-avoiding-merge-conflicts)):
+
+```bash
+dotnet ef migrations add <Name> --project src/TaskList.Infrastructure --output-dir Persistence/Migrations
+```
