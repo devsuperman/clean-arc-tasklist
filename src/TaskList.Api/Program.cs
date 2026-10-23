@@ -29,7 +29,14 @@ builder.Services.AddSerilog((services, logger) =>
     }
 });
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options => options.AddDocumentTransformer((document, _, _) =>
+{
+    document.Info.Title = "Task List API";
+    document.Info.Description =
+        "Manage categories and tasks. Errors are RFC 9457 Problem Details with a `code` from the error catalog "
+        + "(docs/01-business-rules.md) and a `traceId`.";
+    return Task.CompletedTask;
+}));
 builder.Services.AddApiProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -65,7 +72,9 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
     Predicate = check => check.Tags.Contains("ready"),
 });
 
-app.MapGroup("/api/v1").MapEndpoints();
+app.MapGroup("/api/v1")
+    .ProducesProblem(StatusCodes.Status500InternalServerError) // any endpoint can fail unexpectedly (Server.Unexpected)
+    .MapEndpoints();
 
 await app.RunAsync();
 
