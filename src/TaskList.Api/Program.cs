@@ -19,7 +19,9 @@ builder.Services.AddSerilog((services, logger) =>
 
     if (builder.Environment.IsDevelopment())
     {
-        logger.WriteTo.Console(formatProvider: CultureInfo.InvariantCulture);
+        logger.WriteTo.Console(
+            outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}",
+            formatProvider: CultureInfo.InvariantCulture);
     }
     else
     {
@@ -44,6 +46,9 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// Outermost, so it logs the final status code. One event per request: method, path, status, elapsed, trace id.
+// Bodies, headers and query strings are not logged (no sensitive data).
+app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 

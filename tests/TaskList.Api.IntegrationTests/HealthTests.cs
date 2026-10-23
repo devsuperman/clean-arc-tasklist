@@ -26,4 +26,14 @@ public sealed class HealthTests(ApiFactory factory) : IntegrationTest(factory)
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
         (await ReadProblemAsync(response)).TraceId.ShouldNotBeNullOrEmpty();
     }
+
+    [Fact] // TL-042: the traceId returned to the client is the W3C trace id written on every log event
+    public async Task ProblemDetails_TraceId_IsW3CTraceId()
+    {
+        var response = await Client.GetAsync("/api/v1/does-not-exist", CancellationToken);
+
+        var traceId = (await ReadProblemAsync(response)).TraceId;
+        traceId.ShouldNotBeNull();
+        traceId.ShouldMatch("^[0-9a-f]{32}$");
+    }
 }
