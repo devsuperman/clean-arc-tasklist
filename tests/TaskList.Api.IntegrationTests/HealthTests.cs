@@ -36,4 +36,26 @@ public sealed class HealthTests(ApiFactory factory) : IntegrationTest(factory)
         traceId.ShouldNotBeNull();
         traceId.ShouldMatch("^[0-9a-f]{32}$");
     }
+
+    [Theory] // Errors are always Problem Details with a code, also when the framework rejects the request.
+    [InlineData("/api/v1/tasks?status=Foo")]
+    [InlineData("/api/v1/tasks?page=abc")]
+    public async Task MalformedQuery_ReturnsValidationFailedCode(string url)
+    {
+        var response = await Client.GetAsync(url, CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await ReadProblemAsync(response)).Code.ShouldBe("Validation.Failed");
+    }
+
+    [Fact]
+    public async Task MalformedJson_ReturnsValidationFailedCode()
+    {
+        using var content = new StringContent("{ not json", System.Text.Encoding.UTF8, "application/json");
+
+        var response = await Client.PostAsync("/api/v1/tasks", content, CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        (await ReadProblemAsync(response)).Code.ShouldBe("Validation.Failed");
+    }
 }

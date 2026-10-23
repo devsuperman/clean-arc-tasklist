@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using TaskList.Domain.Common;
 
 namespace TaskList.Api.Infrastructure;
 
@@ -15,6 +16,13 @@ internal static class ProblemDetailsExtensions
             context.ProblemDetails.Instance ??= $"{context.HttpContext.Request.Method} {context.HttpContext.Request.Path}";
             context.ProblemDetails.Extensions["traceId"] =
                 Activity.Current?.TraceId.ToString() ?? context.HttpContext.TraceIdentifier;
+
+            // Requests rejected by the framework itself (malformed JSON, an unknown enum name in the query string)
+            // never reach a handler; they are still validation failures for the client.
+            if (context.ProblemDetails.Status == StatusCodes.Status400BadRequest)
+            {
+                context.ProblemDetails.Extensions.TryAdd("code", ValidationError.ErrorCode);
+            }
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();
         return services;
