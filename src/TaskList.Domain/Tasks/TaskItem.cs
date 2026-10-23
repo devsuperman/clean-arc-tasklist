@@ -9,6 +9,16 @@ public sealed class TaskItem : Entity
     public const int TitleMaxLength = 120;
     public const int DescriptionMaxLength = 1000;
 
+    // BR-T05: every allowed (from, to) status change. Anything else, including "to the same status", is rejected.
+    private static readonly HashSet<(TaskStatus From, TaskStatus To)> AllowedTransitions =
+    [
+        (TaskStatus.Pending, TaskStatus.InProgress),
+        (TaskStatus.Pending, TaskStatus.Done),
+        (TaskStatus.InProgress, TaskStatus.Pending),
+        (TaskStatus.InProgress, TaskStatus.Done),
+        (TaskStatus.Done, TaskStatus.Pending),
+    ];
+
     private TaskItem(Guid id, Guid categoryId, DateTimeOffset createdAt)
         : base(id)
     {
@@ -64,7 +74,34 @@ public sealed class TaskItem : Entity
         return result.IsSuccess ? task : result.Error;
     }
 
+    public static bool CanTransition(TaskStatus from, TaskStatus to) => AllowedTransitions.Contains((from, to));
+
+    /// <summary>Start working on the task (<c>→ InProgress</c>).</summary>
+    public Result Start(DateTimeOffset now) => TransitionTo(TaskStatus.InProgress, now);
+
+    /// <summary>Complete the task (<c>→ Done</c>) and record <see cref="CompletedAt"/> (BR-T07).</summary>
+    public Result Complete(DateTimeOffset now) => TransitionTo(TaskStatus.Done, now);
+
+    /// <summary>Go back to <c>Pending</c> from <c>InProgress</c> or <c>Done</c>; clears <see cref="CompletedAt"/> (BR-T07).</summary>
+    public Result Reopen(DateTimeOffset now) => TransitionTo(TaskStatus.Pending, now);
+
+    /// <summary>Not <c>Done</c> and due before <paramref name="today"/>. Calculated, never stored.</summary>
+    public bool IsOverdue(DateOnly today) => Status != TaskStatus.Done && DueDate < today;
+
     private static DateOnly Today(DateTimeOffset now) => DateOnly.FromDateTime(now.UtcDateTime);
+
+    private Result TransitionTo(TaskStatus target, DateTimeOffset now)
+    {
+        if (!CanTransition(Status, target))
+        {
+            return TaskErrors.InvalidStatusTransition(Status, target);
+        }
+
+        Status = target;
+        CompletedAt = target == TaskStatus.Done ? now : null;
+        UpdatedAt = now;
+        return Result.Success();
+    }
 
     private Result ApplyText(string? title, string? description)
     {
