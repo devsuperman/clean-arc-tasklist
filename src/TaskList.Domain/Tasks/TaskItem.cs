@@ -74,6 +74,56 @@ public sealed class TaskItem : Entity
         return result.IsSuccess ? task : result.Error;
     }
 
+    /// <summary>
+    /// Replaces the editable details (full update; a missing priority falls back to <c>Medium</c> as in BR-T03).
+    /// Done tasks are read-only (BR-T08). A past due date is only accepted if it is unchanged (BR-T04).
+    /// </summary>
+    public Result UpdateDetails(
+        string? title,
+        string? description,
+        TaskPriority? priority,
+        DateOnly? dueDate,
+        DateTimeOffset now)
+    {
+        if (Status == TaskStatus.Done)
+        {
+            return TaskErrors.CompletedTaskIsReadOnly;
+        }
+
+        if (dueDate < Today(now) && dueDate != DueDate)
+        {
+            return TaskErrors.DueDateInPast;
+        }
+
+        var result = ApplyText(title, description);
+        if (result.IsFailure)
+        {
+            return result;
+        }
+
+        Priority = priority ?? TaskPriority.Medium;
+        DueDate = dueDate;
+        UpdatedAt = now;
+        return Result.Success();
+    }
+
+    /// <summary>Moves the task to another category (BR-T10). Done tasks are read-only (BR-T08).</summary>
+    public Result MoveTo(Guid categoryId, DateTimeOffset now)
+    {
+        if (Status == TaskStatus.Done)
+        {
+            return TaskErrors.CompletedTaskIsReadOnly;
+        }
+
+        if (categoryId != CategoryId)
+        {
+            CategoryId = categoryId;
+            UpdatedAt = now;
+        }
+
+        return Result.Success();
+    }
+
     public static bool CanTransition(TaskStatus from, TaskStatus to) => AllowedTransitions.Contains((from, to));
 
     /// <summary>Start working on the task (<c>→ InProgress</c>).</summary>
