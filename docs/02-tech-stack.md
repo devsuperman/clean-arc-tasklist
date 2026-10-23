@@ -27,10 +27,10 @@ This document defines **how** the Task List backend is built. The business rules
 
 | Kind | Tools |
 |---|---|
-| Unit tests | **xUnit v3**, **Shouldly** (assertions), **NSubstitute** (mocks) |
+| Unit tests | **xUnit v3** on **Microsoft.Testing.Platform** (enabled in `global.json`), **Shouldly** (assertions), **NSubstitute** (mocks) |
 | Integration tests | `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`), **Testcontainers for .NET** (real PostgreSQL), **Respawn** (reset DB between tests) |
 | Architecture tests | **NetArchTest.Rules** — enforces the dependency rule |
-| Coverage | `coverlet.collector` + ReportGenerator |
+| Coverage | `coverlet.MTP` (`dotnet test --coverlet`) + ReportGenerator |
 
 > Why not FluentAssertions / MediatR / AutoMapper? Their recent major versions moved to commercial licenses.
 > For a study project we keep only permissive (MIT/Apache) dependencies. Mapping is done with plain
@@ -266,7 +266,7 @@ On every push and pull request to `main`:
 2. `dotnet restore`
 3. `dotnet format --verify-no-changes`
 4. `dotnet build -c Release --no-restore`
-5. `dotnet test -c Release --no-build --collect:"XPlat Code Coverage"` (Docker is available on `ubuntu-latest`, so Testcontainers works)
+5. `dotnet test -c Release --no-build --coverlet --coverlet-output-format cobertura` (Docker is available on `ubuntu-latest`, so Testcontainers works)
 6. Publish coverage summary to the job summary.
 
 Quality gate: build fails on warnings, formatting issues, failing tests or architecture test violations.
@@ -281,6 +281,6 @@ Quality gate: build fails on warnings, formatting issues, failing tests or archi
 | Application | `FluentValidation`, `FluentValidation.DependencyInjectionExtensions` |
 | Infrastructure | `Microsoft.EntityFrameworkCore`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `EFCore.NamingConventions`, `Microsoft.EntityFrameworkCore.Design` |
 | Api | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Serilog.AspNetCore`, `AspNetCore.HealthChecks.NpgSql` |
-| Tests | `xunit.v3`, `Shouldly`, `NSubstitute`, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Respawn`, `NetArchTest.Rules`, `Microsoft.Extensions.TimeProvider.Testing`, `coverlet.collector` |
+| Tests | `xunit.v3`, `Shouldly`, `NSubstitute`, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Respawn`, `NetArchTest.Rules`, `Microsoft.Extensions.TimeProvider.Testing`, `coverlet.MTP` |
 
 Versions are pinned in `Directory.Packages.props` (use the latest stable that targets .NET 10).
