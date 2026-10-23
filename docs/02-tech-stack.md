@@ -111,7 +111,7 @@ clean-arc-tasklist/
 │   │   │   └── Repositories/
 │   │   └── DependencyInjection.cs
 │   └── TaskList.Api/
-│       ├── Endpoints/             # CategoryEndpoints, TaskEndpoints
+│       ├── Endpoints/             # one file per endpoint (IEndpoint), grouped in Categories/ and Tasks/
 │       ├── Contracts/             # request/response records
 │       ├── Infrastructure/        # ResultExtensions, GlobalExceptionHandler
 │       └── Program.cs
@@ -203,6 +203,7 @@ public Result Complete(DateTimeOffset now)
 
 ### 4.5 API conventions
 
+- One class per endpoint implementing `IEndpoint`, discovered by assembly scanning (no edits to `Program.cs` per endpoint).
 - Base path `/api/v1`. JSON with camelCase; enums serialized as strings (`JsonStringEnumConverter`).
 - `POST` returns `201 Created` with `Location`; `PUT`/`DELETE`/status actions return `204 No Content`.
 - Every error is Problem Details with `type`, `title`, `status`, `detail`, `code`, `traceId` (and `errors` for validation).
