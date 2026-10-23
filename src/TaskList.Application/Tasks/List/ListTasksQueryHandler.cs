@@ -9,14 +9,6 @@ namespace TaskList.Application.Tasks.List;
 internal sealed class ListTasksQueryHandler(IReadDbContext db, TimeProvider timeProvider)
     : IQueryHandler<ListTasksQuery, PagedResult<TaskResponse>>
 {
-    public async Task<Result<PagedResult<TaskResponse>>> Handle(ListTasksQuery query, CancellationToken cancellationToken)
-    {
-        var today = timeProvider.Today();
-        var tasks = db.Tasks
-            .WhereCategory(query.CategoryId)
-            .ApplyListQuery(query, today)
-            .SelectResponse(db.Categories, today);
-
-        return await db.ToPagedResultAsync(tasks, query, cancellationToken);
-    }
+    public async Task<Result<PagedResult<TaskResponse>>> Handle(ListTasksQuery query, CancellationToken cancellationToken) =>
+        await db.ListTasksAsync(query.CategoryId, query, timeProvider.Today(), cancellationToken);
 }
