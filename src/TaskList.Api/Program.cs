@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Scalar.AspNetCore;
 using Serilog;
 using Serilog.Formatting.Compact;
+using TaskList.Api.Endpoints;
 using TaskList.Api.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -53,6 +54,8 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
 });
+
+app.MapGroup("/api/v1").MapEndpoints();
 
 app.Run();
 
