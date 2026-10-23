@@ -391,3 +391,10 @@ dotnet_naming_style.s_camelcase.required_suffix =
 dotnet_naming_style.s_camelcase.word_separator = 
 dotnet_naming_style.s_camelcase.capitalization = camel_case
 
+
+#### Project analyzer overrides ####
+[*.cs]
+# "Error" is the domain name used across the docs; VB keyword clashes do not matter here.
+dotnet_diagnostic.CA1716.severity = none
+# Result<T>.Success/Failure are intentional static factories.
+dotnet_diagnostic.CA1000.severity = none
