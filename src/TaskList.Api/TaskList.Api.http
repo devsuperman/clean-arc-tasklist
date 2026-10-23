@@ -1,0 +1,123 @@
+# Task List API — one request per endpoint, in an order you can run top to bottom.
+# Works with Visual Studio, Rider and VS Code (REST Client). Start the API first:
+#   docker compose up -d db && dotnet run --project src/TaskList.Api
+# Named requests (# @name) let later requests reuse ids from earlier responses.
+
+@baseUrl = http://localhost:5080/api/v1
+
+### Health (outside /api/v1)
+GET http://localhost:5080/health/ready
+
+### UC-01 · Create category
+# @name createCategory
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Study",
+  "description": "Books and courses",
+  "color": "#1e90ff"
+}
+
+### UC-01 · Create category with a duplicate name (409 Category.NameAlreadyExists)
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "STUDY"
+}
+
+### UC-01 · Create a second category (used to move a task)
+# @name createOtherCategory
+POST {{baseUrl}}/categories
+Content-Type: application/json
+
+{
+  "name": "Work"
+}
+
+### UC-02 · Get category by id (with task counters)
+GET {{baseUrl}}/categories/{{createCategory.response.body.$.id}}
+
+### UC-03 · List categories (paged, search)
+GET {{baseUrl}}/categories?page=1&pageSize=20&search=stu
+
+### UC-04 · Update category
+PUT {{baseUrl}}/categories/{{createCategory.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "name": "Study & Courses",
+  "description": "Books, courses and talks",
+  "color": "#1E90FF"
+}
+
+### UC-06 · Create task
+# @name createTask
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Read the Clean Architecture book",
+  "description": "Chapters 1 to 5",
+  "categoryId": "{{createCategory.response.body.$.id}}",
+  "priority": "High",
+  "dueDate": "2099-11-15"
+}
+
+### UC-06 · Create task with validation errors (400 Validation.Failed)
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "ab",
+  "categoryId": "00000000-0000-0000-0000-000000000000"
+}
+
+### UC-07 · Get task by id
+GET {{baseUrl}}/tasks/{{createTask.response.body.$.id}}
+
+### UC-09 · Update task (details + move to another category)
+PUT {{baseUrl}}/tasks/{{createTask.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "title": "Read the Clean Architecture book",
+  "description": "Chapters 1 to 10",
+  "categoryId": "{{createOtherCategory.response.body.$.id}}",
+  "priority": "Medium",
+  "dueDate": "2099-12-01"
+}
+
+### UC-10 · Start task (Pending → InProgress)
+POST {{baseUrl}}/tasks/{{createTask.response.body.$.id}}/start
+
+### UC-11 · Complete task (→ Done, sets completedAt)
+POST {{baseUrl}}/tasks/{{createTask.response.body.$.id}}/complete
+
+### UC-10 · Start a Done task (409 Task.InvalidStatusTransition)
+POST {{baseUrl}}/tasks/{{createTask.response.body.$.id}}/start
+
+### UC-12 · Reopen task (Done → Pending, clears completedAt)
+POST {{baseUrl}}/tasks/{{createTask.response.body.$.id}}/reopen
+
+### UC-08 · List tasks (filters, sorting, paging)
+GET {{baseUrl}}/tasks?status=Pending&priority=Medium&search=clean&sortBy=dueDate&sortDirection=asc&page=1&pageSize=10
+
+### UC-08 · List overdue tasks
+GET {{baseUrl}}/tasks?overdue=true
+
+### UC-14 · List tasks of a category
+GET {{baseUrl}}/categories/{{createOtherCategory.response.body.$.id}}/tasks?sortBy=priority&sortDirection=desc
+
+### UC-05 · Delete a category that still has tasks (409 Category.HasTasks)
+DELETE {{baseUrl}}/categories/{{createOtherCategory.response.body.$.id}}
+
+### UC-13 · Delete task
+DELETE {{baseUrl}}/tasks/{{createTask.response.body.$.id}}
+
+### UC-05 · Delete category (now empty)
+DELETE {{baseUrl}}/categories/{{createOtherCategory.response.body.$.id}}
+
+### UC-05 · Delete the first category
+DELETE {{baseUrl}}/categories/{{createCategory.response.body.$.id}}
