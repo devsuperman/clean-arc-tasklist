@@ -6,6 +6,8 @@ using Serilog;
 using Serilog.Formatting.Compact;
 using TaskList.Api.Endpoints;
 using TaskList.Api.Infrastructure;
+using TaskList.Application;
+using TaskList.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +32,8 @@ builder.Services.AddApiProblemDetails();
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddHealthChecks()
     .AddNpgSql(
@@ -45,6 +49,7 @@ app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
+    await app.Services.MigrateDatabaseAsync();
     app.MapOpenApi();
     app.MapScalarApiReference();
 }
@@ -57,6 +62,6 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
 
 app.MapGroup("/api/v1").MapEndpoints();
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program;

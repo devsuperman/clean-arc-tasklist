@@ -398,3 +398,8 @@ dotnet_naming_style.s_camelcase.capitalization = camel_case
 dotnet_diagnostic.CA1716.severity = none
 # Result<T>.Success/Failure are intentional static factories.
 dotnet_diagnostic.CA1000.severity = none
+
+# EF Core migrations are generated code: no formatting or analyzer rules.
+[**/Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none
