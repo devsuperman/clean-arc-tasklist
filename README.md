@@ -12,3 +12,17 @@ A backend for a task list to study Clean Architecture.
 | [Tech stack & architecture](docs/02-tech-stack.md) | .NET 10, Clean Architecture layers, patterns, tooling, CI |
 | [Development tasks](docs/03-development-tasks.md) | Backlog by milestone with acceptance criteria and Definition of Done |
 | [Parallel execution plan](docs/04-parallel-execution-plan.md) | Waves, lanes, critical path and merge-conflict rules for building in parallel |
+
+## Getting started
+
+Prerequisites: [.NET 10 SDK](https://dotnet.microsoft.com/download) and Docker.
+
+```bash
+docker compose up -d db                       # start PostgreSQL 17 on localhost:5432
+dotnet tool restore                           # dotnet-ef, reportgenerator
+dotnet run --project src/TaskList.Api         # API on http://localhost:5080, Scalar at /scalar
+dotnet test                                   # all tests (integration tests need Docker)
+```
+
+The connection string lives in `src/TaskList.Api/appsettings.Development.json` and matches the
+`db` service in `docker-compose.yml`. Override it with the `ConnectionStrings__Database` environment variable.

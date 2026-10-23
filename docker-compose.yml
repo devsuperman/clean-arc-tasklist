@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: tasklist
+      POSTGRES_USER: tasklist
+      POSTGRES_PASSWORD: tasklist
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tasklist -d tasklist"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:
+
+# The `api` service is added together with the Dockerfile (TL-040).
