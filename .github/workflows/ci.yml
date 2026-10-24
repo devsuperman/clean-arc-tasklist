@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: |
+          dotnet tool restore
+          dotnet restore
+
+      - name: Format check
+        run: dotnet format --verify-no-changes --no-restore
+
+      # Every business rule ID in docs/01-business-rules.md must be referenced by a test (TL-044).
+      - name: Rule traceability
+        run: python3 build/check-rule-traceability.py
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      # Docker is available on ubuntu-latest, so Testcontainers can start PostgreSQL.
+      - name: Test
+        run: dotnet test -c Release --no-build --coverlet --coverlet-output-format cobertura
+
+      - name: Coverage report
+        if: always()
+        run: >
+          dotnet reportgenerator
+          "-reports:tests/**/TestResults/coverage.cobertura*.xml"
+          -targetdir:coverage
+          "-reporttypes:MarkdownSummaryGithub;Cobertura"
+          "-assemblyfilters:+TaskList.Domain;+TaskList.Application;+TaskList.Infrastructure;+TaskList.Api"
+          "-classfilters:-TaskList.Infrastructure.Persistence.Migrations.*"
+
+      # TL-043: the business rules live in Domain + Application, so they must stay well covered.
+      - name: Coverage gate (Domain + Application >= 90% lines)
+        run: |
+          dotnet reportgenerator \
+            "-reports:tests/**/TestResults/coverage.cobertura*.xml" \
+            -targetdir:coverage/gate \
+            -reporttypes:Cobertura \
+            "-assemblyfilters:+TaskList.Domain;+TaskList.Application"
+          python3 build/check-coverage.py coverage/gate/Cobertura.xml 90
+
+      - name: Publish coverage summary
+        if: always()
+        run: cat coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+
+  migrations-bundle:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      # Self-contained executable that applies pending migrations; see README "Database migrations".
+      - name: Build migrations bundle
+        run: |
+          dotnet tool restore
+          dotnet ef migrations bundle \
+            --project src/TaskList.Infrastructure \
+            --startup-project src/TaskList.Infrastructure \
+            --self-contained -r linux-x64 \
+            -o artifacts/efbundle
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: efbundle-linux-x64
+          path: artifacts/efbundle

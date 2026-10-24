@@ -1,0 +1,23 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- TaskList.Domain.Tasks.TaskStatus clashes with System.Threading.Tasks.TaskStatus (implicit using).
+       A global alias wins over namespace imports, so every project that sees the Domain uses ours. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'TaskList.Domain'">
+    <Using Include="TaskList.Domain.Tasks.TaskStatus" Alias="TaskStatus" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('Tests'))">
+    <OutputType>Exe</OutputType>
+    <!-- Test names use underscores (MethodName_Scenario_ExpectedResult). -->
+    <NoWarn>$(NoWarn);CA1707;CA2007</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -27,10 +27,10 @@ This document defines **how** the Task List backend is built. The business rules
 
 | Kind | Tools |
 |---|---|
-| Unit tests | **xUnit v3**, **Shouldly** (assertions), **NSubstitute** (mocks) |
+| Unit tests | **xUnit v3** on **Microsoft.Testing.Platform** (enabled in `global.json`), **Shouldly** (assertions), **NSubstitute** (mocks) |
 | Integration tests | `Microsoft.AspNetCore.Mvc.Testing` (`WebApplicationFactory`), **Testcontainers for .NET** (real PostgreSQL), **Respawn** (reset DB between tests) |
 | Architecture tests | **NetArchTest.Rules** — enforces the dependency rule |
-| Coverage | `coverlet.collector` + ReportGenerator |
+| Coverage | `coverlet.MTP` (`dotnet test --coverlet`) + ReportGenerator |
 
 > Why not FluentAssertions / MediatR / AutoMapper? Their recent major versions moved to commercial licenses.
 > For a study project we keep only permissive (MIT/Apache) dependencies. Mapping is done with plain
@@ -111,7 +111,7 @@ clean-arc-tasklist/
 │   │   │   └── Repositories/
 │   │   └── DependencyInjection.cs
 │   └── TaskList.Api/
-│       ├── Endpoints/             # CategoryEndpoints, TaskEndpoints
+│       ├── Endpoints/             # one file per endpoint (IEndpoint), grouped in Categories/ and Tasks/
 │       ├── Contracts/             # request/response records
 │       ├── Infrastructure/        # ResultExtensions, GlobalExceptionHandler
 │       └── Program.cs
@@ -198,11 +198,13 @@ public Result Complete(DateTimeOffset now)
 - Unique index on `lower(name)` for categories (backs BR-C01 at DB level).
 - Indexes: `tasks(category_id)`, `tasks(status)`, `tasks(due_date)`.
 - `IUnitOfWork.SaveChangesAsync` is called by the command handler; repositories never save by themselves.
-- Migrations are applied automatically on startup **only in Development**; other environments use
-  `dotnet ef migrations bundle` or a SQL script in the deploy pipeline.
+- Migrations are applied automatically on startup **only in Development**; other environments run the
+  self-contained migrations bundle built by CI (see README "Database migrations").
+- A design-time `DbContext` factory in Infrastructure lets `dotnet ef` run without starting the API host.
 
 ### 4.5 API conventions
 
+- One class per endpoint implementing `IEndpoint`, discovered by assembly scanning (no edits to `Program.cs` per endpoint).
 - Base path `/api/v1`. JSON with camelCase; enums serialized as strings (`JsonStringEnumConverter`).
 - `POST` returns `201 Created` with `Location`; `PUT`/`DELETE`/status actions return `204 No Content`.
 - Every error is Problem Details with `type`, `title`, `status`, `detail`, `code`, `traceId` (and `errors` for validation).
@@ -265,7 +267,7 @@ On every push and pull request to `main`:
 2. `dotnet restore`
 3. `dotnet format --verify-no-changes`
 4. `dotnet build -c Release --no-restore`
-5. `dotnet test -c Release --no-build --collect:"XPlat Code Coverage"` (Docker is available on `ubuntu-latest`, so Testcontainers works)
+5. `dotnet test -c Release --no-build --coverlet --coverlet-output-format cobertura` (Docker is available on `ubuntu-latest`, so Testcontainers works)
 6. Publish coverage summary to the job summary.
 
 Quality gate: build fails on warnings, formatting issues, failing tests or architecture test violations.
@@ -280,6 +282,6 @@ Quality gate: build fails on warnings, formatting issues, failing tests or archi
 | Application | `FluentValidation`, `FluentValidation.DependencyInjectionExtensions` |
 | Infrastructure | `Microsoft.EntityFrameworkCore`, `Npgsql.EntityFrameworkCore.PostgreSQL`, `EFCore.NamingConventions`, `Microsoft.EntityFrameworkCore.Design` |
 | Api | `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`, `Serilog.AspNetCore`, `AspNetCore.HealthChecks.NpgSql` |
-| Tests | `xunit.v3`, `Shouldly`, `NSubstitute`, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Respawn`, `NetArchTest.Rules`, `Microsoft.Extensions.TimeProvider.Testing`, `coverlet.collector` |
+| Tests | `xunit.v3`, `Shouldly`, `NSubstitute`, `Microsoft.AspNetCore.Mvc.Testing`, `Testcontainers.PostgreSql`, `Respawn`, `NetArchTest.Rules`, `Microsoft.Extensions.TimeProvider.Testing`, `coverlet.MTP` |
 
 Versions are pinned in `Directory.Packages.props` (use the latest stable that targets .NET 10).

@@ -2,6 +2,7 @@
 
 Backlog for building the Task List backend. Business rules: [01-business-rules.md](01-business-rules.md).
 Stack and architecture: [02-tech-stack.md](02-tech-stack.md).
+Who works on what in parallel: [04-parallel-execution-plan.md](04-parallel-execution-plan.md).
 
 ## How to use this backlog
 
@@ -10,14 +11,16 @@ Stack and architecture: [02-tech-stack.md](02-tech-stack.md).
 - One task = one branch = one pull request. Branch name: `feature/TL-xxx-short-name`.
 - A task is **done** when it meets the [Definition of Done](#definition-of-done).
 - Build **inside-out**: Domain → Application → Infrastructure → Api. Every layer is tested before the next one uses it.
+- A task is **ready** when every task in its *Depends on* line is merged into `main`. Many tasks can run in parallel —
+  see the [parallel execution plan](04-parallel-execution-plan.md) for waves, lanes and merge-conflict rules.
 
 ## Milestones
 
 | Milestone | Goal | Tasks |
 |---|---|---|
-| **M0 – Foundation** | Empty solution that builds, runs and is checked by CI | TL-001 → TL-006 |
+| **M0 – Foundation** | Empty solution that builds, runs and is checked by CI | TL-001 → TL-007 |
 | **M1 – Domain** | Entities and rules, 100% unit tested | TL-010 → TL-013 |
-| **M2 – Categories** | Full Category CRUD through the API | TL-020 → TL-027 |
+| **M2 – Categories** | Shared contracts + full Category CRUD through the API | TL-020 → TL-028 |
 | **M3 – Tasks** | Full Task CRUD + status lifecycle + listing | TL-030 → TL-039 |
 | **M4 – Quality & Ops** | Hardening, docs, Docker image | TL-040 → TL-045 |
 
@@ -29,8 +32,9 @@ flowchart LR
     M3 --> M4[M4 Quality & Ops]
 ```
 
-Parallel work: after **TL-013**, one developer can take Categories (M2) while another prepares
-Task application handlers (TL-030 → TL-034) against the repository interfaces.
+Milestones describe *scope*, not a strict sequence: once the shared contracts (TL-007, TL-022, TL-028, TL-030)
+are merged, every Category **and** Task use case can be built at the same time.
+See the [parallel execution plan](04-parallel-execution-plan.md).
 
 ---
 
@@ -39,6 +43,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 ### TL-001 · Create solution and projects — S
 **Depends on:** —
 - Create `TaskList.slnx`, `global.json` (.NET 10 SDK), `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`, `.gitignore`.
+- Add **every** package from [02 §8](02-tech-stack.md#8-main-nuget-packages) to `Directory.Packages.props` now, so parallel tasks don't all edit it.
 - Create the 4 `src` projects and 4 `tests` projects from the [solution structure](02-tech-stack.md#3-solution-structure).
 - Add project references following the dependency rule.
 
@@ -94,6 +99,18 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] Pipeline runs on push and PR to `main` and is green.
 - [ ] A formatting error or failing test makes the pipeline red.
 
+### TL-007 · Api conventions — S
+**Depends on:** TL-003, TL-004
+- `ResultExtensions.ToProblem()`: maps `ErrorType` to HTTP (`Validation → 400`, `NotFound → 404`, `Conflict → 409`,
+  `Unexpected → 500`) as Problem Details with `code` and `traceId` (and `errors` for validation).
+- `IEndpoint` interface + `MapEndpoints()` that discovers endpoints by assembly scanning. **One file per endpoint**
+  under `Endpoints/<Feature>/` (e.g. `Endpoints/Tasks/CompleteTask.cs`), mapped into the `/api/v1` group.
+- After this task, use case tasks never edit `Program.cs`.
+
+**AC**
+- [ ] Unit tests: each `ErrorType` maps to the right status code and Problem Details fields.
+- [ ] A new endpoint class is picked up without touching `Program.cs`.
+
 ---
 
 ## M1 – Domain
@@ -102,7 +119,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 **Depends on:** TL-003
 - `Category` with `Create(name, description, color, now)`, `Update(name, description, color, now)`.
 - Trimming (BR-G01), color normalization (BR-C03), field length invariants.
-- `CategoryErrors` per the [error catalog](01-business-rules.md#6-error-catalog).
+- **All** `CategoryErrors` from the [error catalog](01-business-rules.md#6-error-catalog) (also the ones only used later by handlers).
 
 **AC**
 - [ ] Unit tests for every rule: BR-G01, BR-C03, name/description lengths, `CreatedAt`/`UpdatedAt` from the given `now`.
@@ -112,6 +129,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - `TaskStatus`, `TaskPriority` enums; `TaskItem.Create(title, description, categoryId, priority, dueDate, now)`.
 - Defaults: status `Pending` (BR-T02), priority `Medium` (BR-T03).
 - Due date not in the past on creation (BR-T04).
+- **All** `TaskErrors` from the [error catalog](01-business-rules.md#6-error-catalog).
 
 **AC**
 - [ ] Unit tests for BR-T02, BR-T03, BR-T04 (yesterday fails, today passes), lengths and trimming.
@@ -153,6 +171,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
   unique `lower(name)`, FK with `Restrict`). See [persistence conventions](02-tech-stack.md#44-persistence).
 - `AddInfrastructure(configuration)`; `UnitOfWork` implementation; initial migration `InitialCreate`.
 - Apply migrations on startup in Development.
+- Model the **full** v1 schema here. This is the only task that creates a migration (see [hotspots](04-parallel-execution-plan.md#6-avoiding-merge-conflicts)).
 
 **AC**
 - [ ] `dotnet ef database update` creates the schema; inserting two categories `Work`/`work` directly in SQL fails.
@@ -162,14 +181,25 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 **Depends on:** TL-021, TL-004
 - `ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime` with a PostgreSQL Testcontainer.
 - Respawn reset between tests; `FakeTimeProvider` replacing `TimeProvider`.
-- Helpers to create categories/tasks via the API.
+- Seed helpers that create categories/tasks **directly through `AppDbContext`** (not through the API), so each use case's
+  tests don't depend on other use cases.
 
 **AC**
 - [ ] A sample test hits `/health/ready` and passes locally and in CI.
 
+### TL-028 · Application ports & shared contracts — S
+**Depends on:** TL-010, TL-011, TL-020
+- `ICategoryRepository` (`GetByIdAsync`, `ExistsAsync`, `AddAsync`, `Remove`, `NameExistsAsync(name, excludeId?)`).
+- `ITaskRepository` (`GetByIdAsync`, `AddAsync`, `Remove`, `CountByCategoryAsync`).
+- The read-side abstraction used by query handlers (decide it here, so query tasks don't each invent one).
+- Shared response DTOs (`CategoryResponse`, `TaskResponse`, category summary) and their `ToResponse()` mappings.
+
+**AC**
+- [ ] Compiles; architecture tests green. Use case tasks only **add** members to these types.
+
 ### TL-023 · Create category (UC-01) — M
-**Depends on:** TL-020, TL-021
-- `CreateCategoryCommand` + validator + handler; `ICategoryRepository` (`AddAsync`, `NameExistsAsync(name, excludeId?)`).
+**Depends on:** TL-007, TL-022, TL-030
+- `CreateCategoryCommand` + validator + handler.
 - `POST /api/v1/categories` → 201 with `Location`.
 
 **AC**
@@ -177,28 +207,28 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] Integration tests: 201 happy path, 400 validation (with `errors`), 409 duplicate name with different casing.
 
 ### TL-024 · Get category by id (UC-02) — S
-**Depends on:** TL-023
+**Depends on:** TL-007, TL-022, TL-030
 - Query with `TaskCount` and `PendingTaskCount` (BR-C07). `GET /api/v1/categories/{id}`.
 
 **AC**
 - [ ] Integration tests: 200 with correct counts, 404 `Category.NotFound`.
 
 ### TL-025 · List categories (UC-03) — M
-**Depends on:** TL-023
+**Depends on:** TL-007, TL-022, TL-030
 - Pagination (BR-L01, BR-L02), `search` filter (BR-L06), order by name (BR-C06). `GET /api/v1/categories`.
 
 **AC**
 - [ ] Integration tests: pagination metadata, search case-insensitive, `pageSize=101` → 400.
 
 ### TL-026 · Update category (UC-04) — S
-**Depends on:** TL-023
+**Depends on:** TL-007, TL-022, TL-030
 - `PUT /api/v1/categories/{id}` → 204.
 
 **AC**
 - [ ] Integration tests: 204, 404, 409 duplicate, renaming to same name with other casing is allowed (BR-C02), `UpdatedAt` set.
 
 ### TL-027 · Delete category (UC-05) — S
-**Depends on:** TL-023, TL-031
+**Depends on:** TL-007, TL-022, TL-030
 - Blocked when the category has tasks (BR-C04) — response `detail` includes the number of tasks.
 - `DELETE /api/v1/categories/{id}` → 204.
 
@@ -209,15 +239,15 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 
 ## M3 – Tasks
 
-### TL-030 · Task repository — S
-**Depends on:** TL-021
-- `ITaskRepository` (`GetByIdAsync`, `AddAsync`, `Remove`, `CountByCategoryAsync`) + implementation.
+### TL-030 · Repository implementations — S
+**Depends on:** TL-021, TL-028
+- EF Core implementations of `ICategoryRepository` and `ITaskRepository` (and the read-side abstraction) from TL-028.
 
 **AC**
 - [ ] Used by the handlers below; covered by their integration tests.
 
 ### TL-031 · Create task (UC-06) — M
-**Depends on:** TL-013, TL-030, TL-023
+**Depends on:** TL-007, TL-011, TL-022, TL-030
 - Command + validator + handler. Checks category exists (BR-T01). Uses `TimeProvider` for "today".
 - `POST /api/v1/tasks` → 201 with `Location`.
 
@@ -225,14 +255,14 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] Integration tests: 201 (status `Pending`, priority default `Medium`), 400 validation, 400 `Task.DueDateInPast`, 404 `Category.NotFound`.
 
 ### TL-032 · Get task by id (UC-07) — S
-**Depends on:** TL-031
+**Depends on:** TL-007, TL-022, TL-030
 - Response includes nested category summary and `isOverdue`. `GET /api/v1/tasks/{id}`.
 
 **AC**
 - [ ] Integration tests: 200, 404; `isOverdue` true after advancing `FakeTimeProvider` past the due date.
 
 ### TL-033 · Update task (UC-09) — M
-**Depends on:** TL-031
+**Depends on:** TL-007, TL-013, TL-022, TL-030
 - Updates details and category (BR-T10). Ignores `status` if sent (BR-T06).
 - `PUT /api/v1/tasks/{id}` → 204.
 
@@ -240,7 +270,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] Integration tests: 204, 404 task, 404 category, 409 `Task.CompletedTaskIsReadOnly`, past due date kept unchanged is accepted.
 
 ### TL-034 · Status actions (UC-10, UC-11, UC-12) — M
-**Depends on:** TL-031
+**Depends on:** TL-007, TL-012, TL-022, TL-030
 - `POST /api/v1/tasks/{id}/start | complete | reopen` → 204.
 
 **AC**
@@ -248,14 +278,15 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] `completedAt` set/cleared as per BR-T07 (checked with `FakeTimeProvider`).
 
 ### TL-035 · Delete task (UC-13) — S
-**Depends on:** TL-031
+**Depends on:** TL-007, TL-022, TL-030
 - `DELETE /api/v1/tasks/{id}` → 204 in any status (BR-T09).
 
 **AC**
-- [ ] Integration tests: 204, 404; after deleting all tasks the category can be deleted.
+- [ ] Integration tests: 204, 404; the task is gone from the database.
+  (The end-to-end "delete all tasks, then delete the category" flow is checked in TL-044, once both endpoints exist.)
 
 ### TL-036 · List tasks with filters (UC-08) — L
-**Depends on:** TL-031
+**Depends on:** TL-007, TL-022, TL-030
 - Filters (BR-L03, BR-L04), sorting with nulls last for due date (BR-L05), pagination (BR-L01/02).
 - Build the query with composable `IQueryable` extension methods (`WhereStatus`, `WhereSearch`, `ApplySort`...).
 - `GET /api/v1/tasks`.
@@ -272,14 +303,14 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 - [ ] Integration tests: 200 with only that category's tasks, 404 for unknown category.
 
 ### TL-038 · OpenAPI polish — S
-**Depends on:** TL-034, TL-036
+**Depends on:** all M2 and M3 endpoints (TL-023 → TL-037)
 - Names, summaries, tags, `Produces`/`ProducesProblem` metadata on every endpoint; request examples.
 
 **AC**
 - [ ] Every endpoint in Scalar shows all possible status codes and schemas.
 
 ### TL-039 · HTTP request samples — S
-**Depends on:** TL-036
+**Depends on:** all M2 and M3 endpoints (TL-023 → TL-037)
 - `src/TaskList.Api/TaskList.Api.http` with a request for each endpoint.
 
 **AC**
@@ -319,6 +350,7 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 
 ### TL-044 · Rule traceability review — S
 **Depends on:** M3 done
+- Add an end-to-end test: create category → create tasks → delete category fails (409) → delete tasks → delete category (204).
 - Check that every rule ID in [01-business-rules.md](01-business-rules.md) has at least one test referencing it
   (e.g. `// BR-T05` comment or test name).
 
@@ -348,9 +380,9 @@ Task application handlers (TL-030 → TL-034) against the repository interfaces.
 
 | Milestone | Tasks | Estimated effort |
 |---|---|---|
-| M0 Foundation | 6 | ~4 days |
+| M0 Foundation | 7 | ~4.5 days |
 | M1 Domain | 4 | ~3.5 days |
-| M2 Categories | 8 | ~6 days |
+| M2 Categories | 9 | ~6.5 days |
 | M3 Tasks | 10 | ~9 days |
 | M4 Quality & Ops | 6 | ~3 days |
-| **Total** | **34** | **~25 developer-days** |
+| **Total** | **36** | **~26 developer-days** |
